@@ -6177,6 +6177,674 @@ function FuraPunishmentManager.renderSpectatePanel()
 end
 
 -- ============================================
+-- BW PUNISHMENT MANAGER — Biznes uchun urush qoidalari
+-- /bw bilan yoqiladi/o'chiriladi. SP paytida alohida oynacha chiqadi.
+-- FW jazolarga o'xshash struktura, FamilyTracker ishlatilmaydi.
+-- ============================================
+BwPunishmentManager = {
+    configPath = nil,
+    enabled = false,
+    rules = {},
+    editors = {},
+    ui = {
+        pos = { x = 120, y = 0 },
+        size = { width = 420, height = 400 },
+        initialized = false
+    },
+    dirty = false,
+    lastUiSaveAt = 0
+}
+
+function BwPunishmentManager.getDefaultRules()
+    return {
+        -- I. UMUMIY QOIDALAR
+        {
+            id = "bw_1_1",
+            label = "1.1",
+            description = "Lider o'z muddatining boshida 24 soatga bitta strel muzlatish huquqiga ega.",
+            commands = {}
+        },
+        {
+            id = "bw_1_1_1",
+            label = "1.1.1",
+            description = "Muzlatish vaqtida strel belgilash taqiqlanadi. | Og'zaki ogohlantirish + bekor qilish va hujumni yo'qotish.",
+            commands = {},
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_2",
+            label = "1.2",
+            description = "Strellar lider yoki lider o'rinbosari tomonidan OOC tarzda Discord kanalida belgilanadi.",
+            commands = {}
+        },
+        {
+            id = "bw_1_2_1",
+            label = "1.2.1",
+            description = "Hujum qiluvchi tomon strel yakunlanganidan keyin 15 daqiqa ichida BIZWAR kanalida natijalarni e'lon qilishi shart.",
+            commands = {},
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_2_2",
+            label = "1.2.2",
+            description = "Strelni ko'chirish mumkin bo'lgan maksimal vaqt — 15 daqiqa.",
+            commands = {},
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_3",
+            label = "1.3",
+            description = "Har bir OPG maksimal 3 ta hujum va 3 ta himoya. Yakshanba: max 2 ta hujum va 2 ta himoya.",
+            commands = {}
+        },
+        {
+            id = "bw_1_3_1",
+            label = "1.3.1",
+            description = "Ikki OPG o'zaro maksimal 2 ta hujum va 2 ta himoya o'tkazishi mumkin.",
+            commands = {},
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_3_2",
+            label = "1.3.2",
+            description = "Global tadbirlar boshlanishidan 1 soat oldin strel belgilash taqiqlanadi. Istisno: tadbirda ishtirok etmayotgan OPGlar.",
+            commands = {},
+            comment = "Hujum bekor qilinadi, liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_3_4",
+            label = "1.3.4",
+            description = "Strel shartlarini o'zaro kelishuvsiz va kurator tasdiqlamasdan o'zgartirish taqiqlanadi.",
+            commands = {},
+            comment = "Liderga og'zaki ogohlantirish, hujumni yo'qotish, biznesni qaytarish (otkat)"
+        },
+        {
+            id = "bw_1_4",
+            label = "1.4",
+            description = "Ish kunlari strellar 14:00-23:00 (MSK), dam olish kunlari 12:00-23:00.",
+            commands = {},
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_5",
+            label = "1.5",
+            description = "Har ikki OPG to'liq tarkibda RP-dialog o'tkazishi shart. Hujumchi otishma vaqtini belgilaydi, himoyachi tarafni tanlaydi.",
+            commands = {}
+        },
+        {
+            id = "bw_1_5_1",
+            label = "1.5.1",
+            description = "Otishma RP-dialog tugaganidan kamida 1 daqiqa, ko'pi bilan 2 daqiqa ichida boshlanishi kerak.",
+            commands = {},
+            comment = "Og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_6",
+            label = "1.6",
+            description = "Lesopilka: min 6, max 15. Svalka: min 10, max 30. Liderlar kelishuvi bilan limitdan oshish mumkin.",
+            commands = {}
+        },
+        {
+            id = "bw_1_7",
+            label = "1.7",
+            description = "Har bir OPG haftasiga kamida 1 marta Svalkada hujum o'tkazishi shart.",
+            commands = {},
+            comment = "Og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_8",
+            label = "1.8",
+            description = "Bizvar hududida begona o'yinchilarning bo'lishi taqiqlanadi. Jazo: SPAWN | KICK.",
+            commands = { "/spawn {id}" }
+        },
+        {
+            id = "bw_1_9",
+            label = "1.9",
+            description = "Davlat tashkilotlari xodimlariga bizvar boshlanishidan 1 soatdan kam vaqt qolganda OPGga reyd taqiqlanadi.",
+            commands = {},
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_10",
+            label = "1.10",
+            description = "Ishtirokchilarning minimal o'yin darajasi — 7. Jazo: DEMORGAN 30 daqiqa. 3+ ishtirokchi bo'lsa — biznes qaytariladi + og'zaki ogohlantirish.",
+            commands = { "/jail {id} 30 1.10bw" }
+        },
+        {
+            id = "bw_1_11",
+            label = "1.11",
+            description = "Kelmaslik (nepriyezd) jadval bo'yicha 12:30 dan hisoblanadi. 2 ta buzsa — 1 biznes beriladi va BW bekor.",
+            commands = {},
+            comment = "Og'zaki ogohlantirish beriladi. 2+ ishtirokchi kelmasa — hujum/himoya natijasi belgilanadi"
+        },
+        {
+            id = "bw_1_12",
+            label = "1.12",
+            description = "Katta kurator / kurator o'rinbosari vaziyatga qarab jazo berishi yoki qayta o'ynash belgilashi mumkin.",
+            commands = {}
+        },
+        {
+            id = "bw_1_13",
+            label = "1.13",
+            description = "Zabiv shartlarini buzish taqiqlanadi. Jazo: DEMORGAN 30 daqiqa + og'zaki ogohlantirish.",
+            commands = { "/jail {id} 30 1.13bw" },
+            comment = "Og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_1_14",
+            label = "1.14",
+            description = "Strelni boshlanishidan kamida 60 daqiqa oldin va kechida 40 daqiqa oldin belgilash mumkin.",
+            commands = {},
+            comment = "Strel bekor qilinadi + hujum yo'qotiladi + liderga og'zaki ogohlantirish beriladi"
+        },
+        -- II. BIZNES UCHUN URUSH HUDUDIDA
+        {
+            id = "bw_2_1",
+            label = "2.1",
+            description = "O'lgandan keyin strelega qaytish taqiqlanadi. Sug'urta zabivda ko'rsatilgan bo'lishi kerak. Jazo: DEMORGAN 30 daqiqa, biznesni topshirish.",
+            commands = { "/jail {id} 30 2.1bw" },
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_2_2",
+            label = "2.2",
+            description = "Strel hududini tark etish taqiqlanadi. Jazo: DEMORGAN 60 daqiqa. 3+ bo'lsa — biznesni qaytarish.",
+            commands = { "/jail {id} 60 2.2bw" },
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_2_2_1",
+            label = "2.2.1",
+            description = "Strel vaqtida ataylab o'yindan chiqish taqiqlanadi. Crashdan keyin qaytish mumkin emas. Jazo: DEMORGAN 60 daqiqa. 3+ bo'lsa — biznesni qaytarish.",
+            commands = { "/jail {id} 60 2.2.1bw" },
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_2_3",
+            label = "2.3",
+            description = "Balandliklarda yoki pastliklarda joylashish taqiqlanadi. Jazo: DEMORGAN 60 daqiqa. 3+ bo'lsa — biznesni qaytarish.",
+            commands = { "/jail {id} 60 2.3bw" },
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_2_3_1",
+            label = "2.3.1",
+            description = "Zabivda ko'rsatilmagan bo'lsa, devordan oshib o'tish taqiqlanadi. Jazo: DEMORGAN 60 daqiqa.",
+            commands = { "/jail {id} 60 2.3.1bw" }
+        },
+        {
+            id = "bw_2_4",
+            label = "2.4",
+            description = "Tadbir boshlanishidan oldin agressiv yoki provokatsion harakatlar taqiqlanadi. Jazo: WARN. Istisno: ataylab provokatsiya.",
+            commands = { "/warn {id} 2.4bw" }
+        },
+        {
+            id = "bw_2_5",
+            label = "2.5",
+            description = "Tarkibni transfer qilish taqiqlanadi. Jazo: Barcha ishtirokchilarga WARN + biznesni qaytarish.",
+            commands = { "/warn {id} 2.5bw" }
+        },
+        {
+            id = "bw_2_6",
+            label = "2.6",
+            description = "Qizil kvadrat hududidan tashqarida o'ldirish taqiqlanadi. Jazo: DEMORGAN 60 daqiqa. 3+ bo'lsa — biznesni qaytarish.",
+            commands = { "/jail {id} 60 2.6bw" },
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_2_7",
+            label = "2.7",
+            description = "Strel ishtirokchilariga transportda qizil kvadrat hududiga kirish taqiqlanadi. Jazo: DEMORGAN 60 daqiqa.",
+            commands = { "/jail {id} 60 2.7bw" }
+        },
+        {
+            id = "bw_2_8",
+            label = "2.8",
+            description = "Bronjilet va snayper miltig'idan foydalanish taqiqlanadi. Jazo: DEMORGAN 60 daqiqa.",
+            commands = { "/jail {id} 60 2.8bw" }
+        },
+        {
+            id = "bw_2_9",
+            label = "2.9",
+            description = "Soft, skript, chit, bug yoki tizim xatolaridan foydalanish taqiqlanadi. Jazo: WARN | BAN 3-31 kun + biznesni topshirish.",
+            commands = { "/warn {id} 2.9bw" },
+            comment = "Liderga og'zaki ogohlantirish beriladi"
+        },
+        {
+            id = "bw_2_10",
+            label = "2.10",
+            description = "Jang vaqtida HP tiklash vositalaridan foydalanish taqiqlanadi. Faqat pana joyda ruxsat. Jazo: DEMORGAN 60 daqiqa.",
+            commands = { "/jail {id} 60 2.10bw" }
+        },
+        {
+            id = "bw_2_11",
+            label = "2.11",
+            description = "Animatsiyalarni bekor qilish yoki tezlashtirish taqiqlanadi. Jazo: DEMORGAN 60 daqiqa.",
+            commands = { "/jail {id} 60 2.11bw" }
+        },
+        -- III. MULTIMEDIA
+        {
+            id = "bw_3_1",
+            label = "3.1",
+            description = "Har bir ishtirokchi 2 kun davomida fraps saqlashi shart. Minimal sifat 480p. Jazo: WARN/BAN + biznesni qaytarish.",
+            commands = { "/warn {id} 3.1bw" }
+        },
+        {
+            id = "bw_3_3",
+            label = "3.3",
+            description = "Kurator talab qilganda 24 soat ichida frapsni taqdim etish shart. Jazo: BAN 31 kungacha + biznesni qaytarish.",
+            commands = { "/ban {id} 31 3.3bw" }
+        },
+        {
+            id = "bw_3_4",
+            label = "3.4",
+            description = "Fraps so'ralgan o'yinchi yozuvni taqdim etmaguncha keyingi bizvarlarda ishtirok eta olmaydi.",
+            commands = {},
+            comment = "Og'zaki ogohlantirish beriladi"
+        }
+    }
+end
+
+function BwPunishmentManager.getDefaultPos()
+    local screenX, screenY = getScreenResolution()
+    screenX = tonumber(screenX) or 1920
+    screenY = tonumber(screenY) or 1080
+    return math.max(18, screenX - 880), math.max(10, screenY - 450)
+end
+
+function BwPunishmentManager.normalizeCommandTemplate(text)
+    local value = UtilityManager.trim(tostring(text or ""))
+    if value == "" then
+        return ""
+    end
+    if value:sub(1, 1) ~= "/" then
+        value = "/" .. value
+    end
+    return value
+end
+
+function BwPunishmentManager.copyCommands(commands)
+    local result = {}
+    for _, command in ipairs(commands or {}) do
+        result[#result + 1] = BwPunishmentManager.normalizeCommandTemplate(command)
+    end
+    return result
+end
+
+function BwPunishmentManager.markDirty()
+    BwPunishmentManager.dirty = true
+end
+
+function BwPunishmentManager.getRuleSectionName(ruleId)
+    return "rule_" .. tostring(ruleId or "")
+end
+
+function BwPunishmentManager.getRuleById(ruleId)
+    for _, rule in ipairs(BwPunishmentManager.rules or {}) do
+        if tostring(rule.id or "") == tostring(ruleId or "") then
+            return rule
+        end
+    end
+    return nil
+end
+
+function BwPunishmentManager.ensureEditors()
+    BwPunishmentManager.editors = BwPunishmentManager.editors or {}
+    for _, rule in ipairs(BwPunishmentManager.rules or {}) do
+        if not BwPunishmentManager.editors[rule.id] then
+            BwPunishmentManager.editors[rule.id] = {
+                command1 = imgui.new.char[160](),
+                command2 = imgui.new.char[160]()
+            }
+        end
+    end
+end
+
+function BwPunishmentManager.syncEditorBuffers(ruleId)
+    BwPunishmentManager.ensureEditors()
+    for _, rule in ipairs(BwPunishmentManager.rules or {}) do
+        if not ruleId or tostring(rule.id) == tostring(ruleId) then
+            local editor = BwPunishmentManager.editors[rule.id]
+            if editor then
+                UtilityManager.setBufferString(editor.command1, tostring(rule.commands and rule.commands[1] or ""))
+                UtilityManager.setBufferString(editor.command2, tostring(rule.commands and rule.commands[2] or ""))
+            end
+        end
+    end
+end
+
+function BwPunishmentManager.buildPayload()
+    local payload = {
+        main = {
+            panelPosX = tonumber(BwPunishmentManager.ui.pos.x) or 120,
+            panelPosY = tonumber(BwPunishmentManager.ui.pos.y) or 0,
+            panelWidth = tonumber(BwPunishmentManager.ui.size.width) or 420,
+            panelHeight = tonumber(BwPunishmentManager.ui.size.height) or 400
+        }
+    }
+
+    for _, rule in ipairs(BwPunishmentManager.rules or {}) do
+        payload[BwPunishmentManager.getRuleSectionName(rule.id)] = {
+            showInSpectate = rule.showInSpectate == false and 0 or 1,
+            command1 = tostring(rule.commands and rule.commands[1] or ""),
+            command2 = tostring(rule.commands and rule.commands[2] or "")
+        }
+    end
+
+    return payload
+end
+
+function BwPunishmentManager.save(force)
+    if not force and not BwPunishmentManager.dirty then
+        return true
+    end
+    BwPunishmentManager.dirty = false
+    BwPunishmentManager.lastUiSaveAt = os.clock()
+    return UtilityManager.safeIniSave(BwPunishmentManager.buildPayload(), BwPunishmentManager.configPath)
+end
+
+function BwPunishmentManager.flushUiSave(force)
+    if force == true then
+        return BwPunishmentManager.save(true)
+    end
+    if not BwPunishmentManager.dirty then
+        return true
+    end
+    if (os.clock() - tonumber(BwPunishmentManager.lastUiSaveAt or 0)) < 0.40 then
+        return false
+    end
+    return BwPunishmentManager.save(true)
+end
+
+function BwPunishmentManager.load()
+    BwPunishmentManager.configPath = UtilityManager.getConfigPath("bw_punishments.ini")
+    BwPunishmentManager.rules = {}
+
+    local defaultX, defaultY = BwPunishmentManager.getDefaultPos()
+    local saved = UtilityManager.safeIniLoad(BwPunishmentManager.configPath, "BW punishments load")
+    saved = type(saved) == "table" and saved or {}
+    local main = type(saved) == "table" and type(saved.main) == "table" and saved.main or {}
+
+    BwPunishmentManager.ui.pos.x = tonumber(main.panelPosX) or defaultX
+    BwPunishmentManager.ui.pos.y = tonumber(main.panelPosY) or defaultY
+    BwPunishmentManager.ui.size.width = tonumber(main.panelWidth) or 420
+    BwPunishmentManager.ui.size.height = tonumber(main.panelHeight) or 400
+
+    for _, defaultRule in ipairs(BwPunishmentManager.getDefaultRules()) do
+        local section = saved[BwPunishmentManager.getRuleSectionName(defaultRule.id)] or {}
+        local commands = {
+            BwPunishmentManager.normalizeCommandTemplate(section.command1 or defaultRule.commands[1] or ""),
+            BwPunishmentManager.normalizeCommandTemplate(section.command2 or defaultRule.commands[2] or "")
+        }
+        BwPunishmentManager.rules[#BwPunishmentManager.rules + 1] = {
+            id = defaultRule.id,
+            label = defaultRule.label,
+            description = defaultRule.description,
+            comment = defaultRule.comment or nil,
+            showInSpectate = not (tostring(section.showInSpectate or "1") == "0"),
+            defaultCommands = BwPunishmentManager.copyCommands(defaultRule.commands),
+            commands = commands
+        }
+    end
+
+    BwPunishmentManager.ensureEditors()
+    BwPunishmentManager.syncEditorBuffers()
+    BwPunishmentManager.dirty = false
+    BwPunishmentManager.lastUiSaveAt = os.clock()
+end
+
+function BwPunishmentManager.initialize()
+    BwPunishmentManager.load()
+end
+
+function BwPunishmentManager.toggle()
+    BwPunishmentManager.enabled = not BwPunishmentManager.enabled
+    if not BwPunishmentManager.enabled and MainUI and MainUI.playerManagementView == "bw" then
+        MainUI.playerManagementView = "main"
+    end
+    return BwPunishmentManager.enabled
+end
+
+function BwPunishmentManager.getTargetId()
+    return tonumber(SpectateQuickPanel and SpectateQuickPanel.targetId)
+end
+
+function BwPunishmentManager.expandCommand(commandTemplate, targetId)
+    local value = BwPunishmentManager.normalizeCommandTemplate(commandTemplate)
+    if value == "" then
+        return ""
+    end
+
+    local idText = tostring(tonumber(targetId) or 0)
+    value = value:gsub("{%s*[Ii][Dd]%s*}", idText)
+    value = value:gsub("%%[Ii][Dd]%%", idText)
+    value = value:gsub("%$[Ii][Dd]", idText)
+    value = value:gsub("{TARGET}", idText)
+    value = value:gsub("{target}", idText)
+    return UtilityManager.toGameEncoding(value)
+end
+
+function BwPunishmentManager.executeCommands(commands, targetId, actionLabel)
+    local prepared = {}
+    for _, commandTemplate in ipairs(commands or {}) do
+        local command = BwPunishmentManager.expandCommand(commandTemplate, targetId)
+        if UtilityManager.trim(command) ~= "" then
+            prepared[#prepared + 1] = command
+        end
+    end
+
+    if #prepared == 0 then
+        if type(sampAddChatMessage) == "function" then
+            sampAddChatMessage("[BW] Bu band uchun jazo buyruqi sozlanmagan.", 0xFFCC66)
+        end
+        return false
+    end
+
+    local function emit(command)
+        local okSend = sendChat(command)
+        if okSend and LogManager and LogManager.admin then
+            LogManager.admin(string.format("BW punish [%s]: %s", tostring(actionLabel or "rule"), tostring(command)))
+        end
+        return okSend
+    end
+
+    if #prepared == 1 or not (lua_thread and type(lua_thread.create) == "function") then
+        return emit(prepared[1])
+    end
+
+    lua_thread.create(function()
+        for index, command in ipairs(prepared) do
+            emit(command)
+            if index < #prepared and type(wait) == "function" then
+                wait(120)
+            end
+        end
+    end)
+    return true
+end
+
+function BwPunishmentManager.executeRule(rule)
+    local targetId = BwPunishmentManager.getTargetId()
+    if not targetId or targetId <= 0 then
+        if type(sampAddChatMessage) == "function" then
+            sampAddChatMessage("[BW] SP target ID topilmadi.", 0xFF6666)
+        end
+        return false
+    end
+    if type(rule) ~= "table" then
+        return false
+    end
+
+    return BwPunishmentManager.executeCommands(rule.commands, targetId, rule.label or rule.id)
+end
+
+function BwPunishmentManager.applyEditor(ruleId)
+    local rule = BwPunishmentManager.getRuleById(ruleId)
+    local editor = BwPunishmentManager.editors and BwPunishmentManager.editors[ruleId]
+    if not rule or not editor then
+        return false
+    end
+
+    rule.commands = {
+        BwPunishmentManager.normalizeCommandTemplate(UtilityManager.bufferToString(editor.command1)),
+        BwPunishmentManager.normalizeCommandTemplate(UtilityManager.bufferToString(editor.command2))
+    }
+    BwPunishmentManager.markDirty()
+    return BwPunishmentManager.save(true)
+end
+
+function BwPunishmentManager.resetRule(ruleId)
+    local rule = BwPunishmentManager.getRuleById(ruleId)
+    if not rule then
+        return false
+    end
+    rule.commands = BwPunishmentManager.copyCommands(rule.defaultCommands)
+    BwPunishmentManager.syncEditorBuffers(ruleId)
+    BwPunishmentManager.markDirty()
+    return BwPunishmentManager.save(true)
+end
+
+function BwPunishmentManager.renderSpectatePanel()
+    if not BwPunishmentManager.enabled or not SpectateQuickPanel.active or not SpectateQuickPanel.targetId then
+        return
+    end
+
+    local screenX, screenY = getScreenResolution()
+    screenX = tonumber(screenX) or 1920
+    screenY = tonumber(screenY) or 1080
+
+    local ui = BwPunishmentManager.ui
+    ui.pos = ui.pos or { x = 120, y = 0 }
+    ui.size = ui.size or { width = 420, height = 400 }
+
+    local minWidth = 320
+    local minHeight = 220
+    local maxWidth = math.max(minWidth, screenX - 10)
+    local maxHeight = math.max(minHeight, screenY - 10)
+    local defaultX, defaultY = BwPunishmentManager.getDefaultPos()
+    local startX = tonumber(ui.pos.x) or defaultX
+    local startY = tonumber(ui.pos.y) or defaultY
+    local width = UtilityManager.clamp(tonumber(ui.size.width) or 420, minWidth, maxWidth)
+    local height = UtilityManager.clamp(tonumber(ui.size.height) or 400, minHeight, maxHeight)
+
+    startX = UtilityManager.clamp(startX, 10, math.max(10, screenX - width - 10))
+    startY = UtilityManager.clamp(startY, 10, math.max(10, screenY - height - 10))
+
+    if not ui.initialized then
+        imgui.SetNextWindowPos(imgui.ImVec2(startX, startY), imgui.Cond.Always)
+        imgui.SetNextWindowSize(imgui.ImVec2(width, height), imgui.Cond.Always)
+        ui.initialized = true
+    end
+
+    if imgui.SetNextWindowSizeConstraints then
+        imgui.SetNextWindowSizeConstraints(
+            imgui.ImVec2(minWidth, minHeight),
+            imgui.ImVec2(maxWidth, maxHeight)
+        )
+    end
+
+    local flags = imgui.WindowFlags.NoCollapse
+    imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.06, 0.03, 0.09, 0.92))
+    imgui.PushStyleColor(imgui.Col.Border, imgui.ImVec4(0.65, 0.20, 0.80, 0.98))
+    local styleVarPushed = 0
+    if imgui.PushStyleVar and imgui.StyleVar then
+        imgui.PushStyleVar(imgui.StyleVar.WindowRounding, 10)
+        styleVarPushed = 1
+    end
+
+    if imgui.Begin("BW Jazolar##SpectateBwPunishPanel", nil, flags) then
+        local currentPos = imgui.GetWindowPos()
+        local currentSize = imgui.GetWindowSize()
+        if currentPos and currentSize then
+            local changed = false
+            if math.abs((ui.pos.x or 0) - currentPos.x) > 0.5 or math.abs((ui.pos.y or 0) - currentPos.y) > 0.5 then
+                ui.pos.x = currentPos.x
+                ui.pos.y = currentPos.y
+                changed = true
+            end
+            if math.abs((ui.size.width or 0) - currentSize.x) > 0.5 or math.abs((ui.size.height or 0) - currentSize.y) > 0.5 then
+                ui.size.width = currentSize.x
+                ui.size.height = currentSize.y
+                changed = true
+            end
+            if changed then
+                BwPunishmentManager.markDirty()
+            end
+        end
+        BwPunishmentManager.flushUiSave(false)
+
+        imgui.TextColored(imgui.ImVec4(0.65, 0.20, 0.80, 1.0),
+            string.format("BW JAZOLAR: %s", SpectateQuickPanel.getTargetDisplay()))
+        imgui.TextDisabled("/bw bilan yoqiladi yoki o'chiriladi")
+        imgui.TextColored(imgui.ImVec4(0.95, 0.77, 0.06, 1.0), u8"BIZNES UCHUN URUSH")
+        imgui.Separator()
+
+        local contentWidth = math.max(220, imgui.GetContentRegionAvail().x)
+        local gap = 6
+        local columns = contentWidth >= 560 and 4 or 3
+        columns = math.max(2, columns)
+        local buttonWidth = math.max(82, math.floor((contentWidth - ((columns - 1) * gap)) / columns))
+
+        local visibleRules = {}
+        for _, rule in ipairs(BwPunishmentManager.rules or {}) do
+            if rule.showInSpectate ~= false then
+                visibleRules[#visibleRules + 1] = rule
+            end
+        end
+
+        if #visibleRules == 0 then
+            imgui.TextDisabled(u8"SP panel uchun hozircha hech qanday BW band ko'rsatilmayapti.")
+        end
+
+        for index, rule in ipairs(visibleRules) do
+            if imgui.Button(tostring(rule.label or index) .. "##bw_rule_" .. tostring(rule.id or index), imgui.ImVec2(buttonWidth, 30)) then
+                BwPunishmentManager.executeRule(rule)
+            end
+
+            if imgui.IsItemHovered() then
+                imgui.BeginTooltip()
+                if imgui.PushTextWrapPos then
+                    imgui.PushTextWrapPos(420)
+                end
+                if imgui.TextUnformatted then
+                    imgui.TextUnformatted(UtilityManager.toUtf8(rule.description or "") or tostring(rule.description or ""))
+                else
+                    imgui.TextWrapped(UtilityManager.toUtf8(rule.description or "") or tostring(rule.description or ""))
+                end
+                if rule.comment and rule.comment ~= "" then
+                    imgui.TextColored(imgui.ImVec4(1.0, 0.6, 0.2, 1.0),
+                        UtilityManager.toUtf8(rule.comment) or tostring(rule.comment))
+                end
+                local preview = table.concat(rule.commands or {}, " | ")
+                if UtilityManager.trim(preview) ~= "" then
+                    imgui.Separator()
+                    if imgui.TextUnformatted then
+                        imgui.TextUnformatted(preview)
+                    else
+                        imgui.TextWrapped(preview)
+                    end
+                end
+                if imgui.PopTextWrapPos then
+                    imgui.PopTextWrapPos()
+                end
+                imgui.EndTooltip()
+            end
+
+            local lastInRow = (index % columns == 0) or (index == #visibleRules)
+            if not lastInRow then
+                imgui.SameLine(0, gap)
+            end
+        end
+    end
+    imgui.End()
+
+    if styleVarPushed > 0 and imgui.PopStyleVar then
+        imgui.PopStyleVar(styleVarPushed)
+    end
+    imgui.PopStyleColor(2)
+end
+
+-- ============================================
 -- FAMILY TRACKER — Semya aniqlovchi modul
 -- FW jazo berilganda /stats ID yuborib, Oila: qatorini topadi,
 -- INI ga saqlaydi, log yozadi, SP panelda va menyuda qidiruv ishlaydi.
@@ -8889,6 +9557,7 @@ function SpectateQuickPanel.render()
     AutoPunishmentManager.renderSpectatePanel()
     FwPunishmentManager.renderSpectatePanel()
     FuraPunishmentManager.renderSpectatePanel()
+    BwPunishmentManager.renderSpectatePanel()
 end
 
 
@@ -29238,12 +29907,61 @@ function MainUI.renderFuraPunishmentSection()
     imgui.EndChild()
 end
 
+function MainUI.renderBwPunishmentSection()
+    imgui.TextColored(COLORS.INFO or imgui.ImVec4(0.65, 0.20, 0.80, 1.0), u8"BW Jazolar")
+    imgui.TextDisabled(u8"/bw bilan yoqiladi yoki o'chiriladi. SP paytida alohida oynacha chiqadi.")
+    imgui.TextColored(COLORS.WARNING or imgui.ImVec4(0.95, 0.77, 0.06, 1.0), u8"BIZNES UCHUN URUSH")
+    imgui.Separator()
+
+    imgui.BeginChild("##bw_punish_rules_panel", imgui.ImVec2(0, 0), true)
+    for _, rule in ipairs(BwPunishmentManager.rules or {}) do
+        local editor = BwPunishmentManager.editors and BwPunishmentManager.editors[rule.id]
+        imgui.TextColored(COLORS.WARNING or imgui.ImVec4(0.95, 0.77, 0.06, 1.0), tostring(rule.label or "BW"))
+        imgui.SameLine()
+        imgui.TextWrapped(UtilityManager.toUtf8(rule.description or "") or tostring(rule.description or ""))
+        if rule.comment and rule.comment ~= "" then
+            imgui.TextColored(imgui.ImVec4(1.0, 0.6, 0.2, 1.0),
+                u8">> " .. (UtilityManager.toUtf8(rule.comment) or tostring(rule.comment)))
+        end
+        if editor then
+            local showInSpectate = imgui.ImBool(rule.showInSpectate ~= false)
+            if imgui.Checkbox(u8"SP panelda ko'rsatish##bw_show_" .. tostring(rule.id), showInSpectate) then
+                rule.showInSpectate = showInSpectate[0]
+                BwPunishmentManager.markDirty()
+                BwPunishmentManager.save(true)
+            end
+            imgui.InputText("1-buyruq##bw_cmd1_" .. tostring(rule.id), editor.command1, 160)
+            imgui.InputText("2-buyruq##bw_cmd2_" .. tostring(rule.id), editor.command2, 160)
+            if imgui.Button(u8"Saqlash##bw_save_" .. tostring(rule.id), imgui.ImVec2(90, 26)) then
+                BwPunishmentManager.applyEditor(rule.id)
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Default##bw_reset_" .. tostring(rule.id), imgui.ImVec2(90, 26)) then
+                BwPunishmentManager.resetRule(rule.id)
+            end
+            local preview = table.concat(rule.commands or {}, "  |  ")
+            if UtilityManager.trim(preview) ~= "" then
+                imgui.SameLine()
+                imgui.TextDisabled(preview)
+            else
+                imgui.SameLine()
+                imgui.TextDisabled("Jazo buyruqi yo'q")
+            end
+        end
+        imgui.Separator()
+    end
+    imgui.EndChild()
+end
+
 function MainUI.renderPlayerManagement()
     MainUI.playerManagementView = MainUI.playerManagementView or "main"
     if MainUI.playerManagementView == "fw" and not (FwPunishmentManager and FwPunishmentManager.enabled) then
         MainUI.playerManagementView = "main"
     end
     if MainUI.playerManagementView == "fura" and not (FuraPunishmentManager and FuraPunishmentManager.enabled) then
+        MainUI.playerManagementView = "main"
+    end
+    if MainUI.playerManagementView == "bw" and not (BwPunishmentManager and BwPunishmentManager.enabled) then
         MainUI.playerManagementView = "main"
     end
 
@@ -29265,6 +29983,9 @@ function MainUI.renderPlayerManagement()
     if FuraPunishmentManager and FuraPunishmentManager.enabled then
         views[#views + 1] = { id = "fura", label = "FURA" }
     end
+    if BwPunishmentManager and BwPunishmentManager.enabled then
+        views[#views + 1] = { id = "bw", label = "BW" }
+    end
 
     for _, view in ipairs(views) do
         local selected = MainUI.playerManagementView == view.id
@@ -29283,6 +30004,8 @@ function MainUI.renderPlayerManagement()
         MainUI.renderFwPunishmentSection()
     elseif MainUI.playerManagementView == "fura" then
         MainUI.renderFuraPunishmentSection()
+    elseif MainUI.playerManagementView == "bw" then
+        MainUI.renderBwPunishmentSection()
     elseif MainUI.playerManagementView == "auto_punish" then
         MainUI.renderAutoPunishmentSection()
     elseif MainUI.playerManagementView == "semya" then
@@ -33759,6 +34482,17 @@ function processCommand(cmd)
         return false
     end
 
+    if command == "bw" then
+        if not canUseTool() then
+            return false
+        end
+        local enabled = BwPunishmentManager.toggle()
+        if type(sampAddChatMessage) == "function" then
+            sampAddChatMessage(string.format("[BW] %s", enabled and "BW jazolar yoqildi." or "BW jazolar o'chirildi."), enabled and 0x33FF66 or 0xFFAA66)
+        end
+        return false
+    end
+
     -- /testfam ID  — FamilyTracker ni jazo bermay test qilish
     -- Misol: /testfam 42
     if command == "testfam" then
@@ -34429,6 +35163,7 @@ function main()
         { name = "AutoPunishmentManager.initialize", fn = AutoPunishmentManager.initialize },
         { name = "FwPunishmentManager.initialize", fn = FwPunishmentManager.initialize },
         { name = "FuraPunishmentManager.initialize", fn = FuraPunishmentManager.initialize },
+        { name = "BwPunishmentManager.initialize", fn = BwPunishmentManager.initialize },
         { name = "FamilyTracker.initialize", fn = FamilyTracker.initialize },
         { name = "FwReturnTracker.initialize", fn = FwReturnTracker.initialize },
         { name = "MpTeleportCloseTimer.initialize", fn = MpTeleportCloseTimer.initialize },
