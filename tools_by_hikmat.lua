@@ -6845,6 +6845,534 @@ function BwPunishmentManager.renderSpectatePanel()
 end
 
 -- ============================================
+-- GS PUNISHMENT MANAGER — Gos struktura tadbir qoidalari
+-- /gs bilan yoqiladi/o'chiriladi. SP paytida alohida oynacha chiqadi.
+-- FW jazolarga o'xshash struktura, FamilyTracker ishlatilmaydi.
+-- ============================================
+GsPunishmentManager = {
+    configPath = nil,
+    enabled = false,
+    rules = {},
+    editors = {},
+    ui = {
+        pos = { x = 140, y = 0 },
+        size = { width = 420, height = 400 },
+        initialized = false
+    },
+    dirty = false,
+    lastUiSaveAt = 0
+}
+
+function GsPunishmentManager.getDefaultRules()
+    return {
+        -- Umumiy qoidalar
+        {
+            id = "gs_1_1",
+            label = "1.1",
+            description = "Bronjilet (zirhli kamzul)lardan foydalanishga ruxsat etiladi.",
+            commands = {}
+        },
+        {
+            id = "gs_1_2",
+            label = "1.2",
+            description = "Jang vaqtida dori qutilaridan (aptechka) foydalanish taqiqlanadi.",
+            commands = { "/jail {id} 60 1.2 GS/VCH" }
+        },
+        {
+            id = "gs_1_3",
+            label = "1.3",
+            description = "Tadbir davomida animatsiyalardan foydalanish taqiqlanadi.",
+            commands = { "/jail {id} 60 1.3 GS/VCH" }
+        },
+        {
+            id = "gs_1_4",
+            label = "1.4",
+            description = "Tadbir boshlanishidan 5 daqiqa oldin tashkilotlar boshlang'ich joylarida bo'lishi shart. 18:00 dan keyin hududga kirish taqiqlanadi.",
+            commands = { "/spawn {id}" }
+        },
+        {
+            id = "gs_1_5",
+            label = "1.5",
+            description = "Tadbir vaqtida RK taqiqlanadi.",
+            commands = { "/jail {id} 60 1.5 GS/VCH" }
+        },
+        {
+            id = "gs_1_6",
+            label = "1.6",
+            description = "Tadbir davomida niqoblardan foydalanish taqiqlanadi.",
+            commands = { "/jail {id} 60 1.6 GS/VCH" }
+        },
+        {
+            id = "gs_1_7",
+            label = "1.7",
+            description = "Davlat tashkilotlari ham, OPG ham baland joylarni egallashi taqiqlanadi.",
+            commands = { "/jail {id} 60 1.7 GS/VCH" }
+        },
+        {
+            id = "gs_1_8",
+            label = "1.8",
+            description = "Snayper miltiqlari va tayzerdan foydalanish taqiqlanadi.",
+            commands = { "/jail {id} 60 1.8 GS/VCH" }
+        },
+        {
+            id = "gs_1_9",
+            label = "1.9",
+            description = "Devorlardan oshib o'tish taqiqlanadi.",
+            commands = { "/jail {id} 60 1.9 GS/VCH" }
+        },
+        {
+            id = "gs_1_10",
+            label = "1.10",
+            description = "Tadbir hududiga kirilgandan so'ng avtomobillarda harakatlanish taqiqlanadi.",
+            commands = { "/jail {id} 60 1.10 GS/VCH" }
+        },
+        {
+            id = "gs_1_11",
+            label = "1.11",
+            description = "O'yinchilarni avtomobil yordamida o'ldirish taqiqlanadi. Avtomobildan o'q uzish yoki bosib ketish ham taqiqlanadi.",
+            commands = { "/jail {id} 60 1.11 GS/VCH" }
+        },
+        {
+            id = "gs_1_12",
+            label = "1.12",
+            description = "Krash sodir bo'lsa, chiqib ketilgan joyga qaytib kirish taqiqlanadi.",
+            commands = { "/jail {id} 40 1.12 GS/VCH" }
+        },
+        -- OPG qoidalari
+        {
+            id = "gs_3_1",
+            label = "3.1",
+            description = "Harbiy qismda ishtirokchilar soni cheklanmagan. Asosiy omborni egallashda — 80 nafar.",
+            commands = {}
+        },
+        {
+            id = "gs_3_2",
+            label = "3.2",
+            description = "Jang vaqtida narkotiklardan foydalanish taqiqlanadi.",
+            commands = { "/jail {id} 60 3.2 GS/VCH" }
+        },
+        {
+            id = "gs_3_3",
+            label = "3.3",
+            description = "Tadbir boshlanishidan oldin Harbiy qism yoki Asosiy ombor hududiga kirish taqiqlanadi.",
+            commands = { "/jail {id} 60 3.3 GS/VCH" }
+        },
+        {
+            id = "gs_3_4",
+            label = "3.4",
+            description = "Asosiy omborga faqat KPP orqali kirishga ruxsat etiladi.",
+            commands = { "/jail {id} 60 3.4 GS/VCH" }
+        },
+        {
+            id = "gs_3_5",
+            label = "3.5",
+            description = "Harbiy qismda OPG Batyrevo sh. yoqilg'i quyish shoxobchasi yonida yig'iladi. Asosiy omborni egallashda — o'rmonda.",
+            commands = {}
+        },
+        {
+            id = "gs_3_6",
+            label = "3.6",
+            description = "Davlat tuzilmalari xodimlarini arqon bilan bog'lash taqiqlanadi.",
+            commands = { "/jail {id} 60 3.6 GS/VCH" }
+        }
+    }
+end
+
+function GsPunishmentManager.getDefaultPos()
+    local screenX, screenY = getScreenResolution()
+    screenX = tonumber(screenX) or 1920
+    screenY = tonumber(screenY) or 1080
+    return math.max(18, screenX - 900), math.max(10, screenY - 450)
+end
+
+function GsPunishmentManager.normalizeCommandTemplate(text)
+    local value = UtilityManager.trim(tostring(text or ""))
+    if value == "" then
+        return ""
+    end
+    if value:sub(1, 1) ~= "/" then
+        value = "/" .. value
+    end
+    return value
+end
+
+function GsPunishmentManager.copyCommands(commands)
+    local result = {}
+    for _, command in ipairs(commands or {}) do
+        result[#result + 1] = GsPunishmentManager.normalizeCommandTemplate(command)
+    end
+    return result
+end
+
+function GsPunishmentManager.markDirty()
+    GsPunishmentManager.dirty = true
+end
+
+function GsPunishmentManager.getRuleSectionName(ruleId)
+    return "rule_" .. tostring(ruleId or "")
+end
+
+function GsPunishmentManager.getRuleById(ruleId)
+    for _, rule in ipairs(GsPunishmentManager.rules or {}) do
+        if tostring(rule.id or "") == tostring(ruleId or "") then
+            return rule
+        end
+    end
+    return nil
+end
+
+function GsPunishmentManager.ensureEditors()
+    GsPunishmentManager.editors = GsPunishmentManager.editors or {}
+    for _, rule in ipairs(GsPunishmentManager.rules or {}) do
+        if not GsPunishmentManager.editors[rule.id] then
+            GsPunishmentManager.editors[rule.id] = {
+                command1 = imgui.new.char[160](),
+                command2 = imgui.new.char[160]()
+            }
+        end
+    end
+end
+
+function GsPunishmentManager.syncEditorBuffers(ruleId)
+    GsPunishmentManager.ensureEditors()
+    for _, rule in ipairs(GsPunishmentManager.rules or {}) do
+        if not ruleId or tostring(rule.id) == tostring(ruleId) then
+            local editor = GsPunishmentManager.editors[rule.id]
+            if editor then
+                UtilityManager.setBufferString(editor.command1, tostring(rule.commands and rule.commands[1] or ""))
+                UtilityManager.setBufferString(editor.command2, tostring(rule.commands and rule.commands[2] or ""))
+            end
+        end
+    end
+end
+
+function GsPunishmentManager.buildPayload()
+    local payload = {
+        main = {
+            panelPosX = tonumber(GsPunishmentManager.ui.pos.x) or 140,
+            panelPosY = tonumber(GsPunishmentManager.ui.pos.y) or 0,
+            panelWidth = tonumber(GsPunishmentManager.ui.size.width) or 420,
+            panelHeight = tonumber(GsPunishmentManager.ui.size.height) or 400
+        }
+    }
+
+    for _, rule in ipairs(GsPunishmentManager.rules or {}) do
+        payload[GsPunishmentManager.getRuleSectionName(rule.id)] = {
+            showInSpectate = rule.showInSpectate == false and 0 or 1,
+            command1 = tostring(rule.commands and rule.commands[1] or ""),
+            command2 = tostring(rule.commands and rule.commands[2] or "")
+        }
+    end
+
+    return payload
+end
+
+function GsPunishmentManager.save(force)
+    if not force and not GsPunishmentManager.dirty then
+        return true
+    end
+    GsPunishmentManager.dirty = false
+    GsPunishmentManager.lastUiSaveAt = os.clock()
+    return UtilityManager.safeIniSave(GsPunishmentManager.buildPayload(), GsPunishmentManager.configPath)
+end
+
+function GsPunishmentManager.flushUiSave(force)
+    if force == true then
+        return GsPunishmentManager.save(true)
+    end
+    if not GsPunishmentManager.dirty then
+        return true
+    end
+    if (os.clock() - tonumber(GsPunishmentManager.lastUiSaveAt or 0)) < 0.40 then
+        return false
+    end
+    return GsPunishmentManager.save(true)
+end
+
+function GsPunishmentManager.load()
+    GsPunishmentManager.configPath = UtilityManager.getConfigPath("gs_punishments.ini")
+    GsPunishmentManager.rules = {}
+
+    local defaultX, defaultY = GsPunishmentManager.getDefaultPos()
+    local saved = UtilityManager.safeIniLoad(GsPunishmentManager.configPath, "GS punishments load")
+    saved = type(saved) == "table" and saved or {}
+    local main = type(saved) == "table" and type(saved.main) == "table" and saved.main or {}
+
+    GsPunishmentManager.ui.pos.x = tonumber(main.panelPosX) or defaultX
+    GsPunishmentManager.ui.pos.y = tonumber(main.panelPosY) or defaultY
+    GsPunishmentManager.ui.size.width = tonumber(main.panelWidth) or 420
+    GsPunishmentManager.ui.size.height = tonumber(main.panelHeight) or 400
+
+    for _, defaultRule in ipairs(GsPunishmentManager.getDefaultRules()) do
+        local section = saved[GsPunishmentManager.getRuleSectionName(defaultRule.id)] or {}
+        local commands = {
+            GsPunishmentManager.normalizeCommandTemplate(section.command1 or defaultRule.commands[1] or ""),
+            GsPunishmentManager.normalizeCommandTemplate(section.command2 or defaultRule.commands[2] or "")
+        }
+        GsPunishmentManager.rules[#GsPunishmentManager.rules + 1] = {
+            id = defaultRule.id,
+            label = defaultRule.label,
+            description = defaultRule.description,
+            showInSpectate = not (tostring(section.showInSpectate or "1") == "0"),
+            defaultCommands = GsPunishmentManager.copyCommands(defaultRule.commands),
+            commands = commands
+        }
+    end
+
+    GsPunishmentManager.ensureEditors()
+    GsPunishmentManager.syncEditorBuffers()
+    GsPunishmentManager.dirty = false
+    GsPunishmentManager.lastUiSaveAt = os.clock()
+end
+
+function GsPunishmentManager.initialize()
+    GsPunishmentManager.load()
+end
+
+function GsPunishmentManager.toggle()
+    GsPunishmentManager.enabled = not GsPunishmentManager.enabled
+    if not GsPunishmentManager.enabled and MainUI and MainUI.playerManagementView == "gs" then
+        MainUI.playerManagementView = "main"
+    end
+    return GsPunishmentManager.enabled
+end
+
+function GsPunishmentManager.getTargetId()
+    return tonumber(SpectateQuickPanel and SpectateQuickPanel.targetId)
+end
+
+function GsPunishmentManager.expandCommand(commandTemplate, targetId)
+    local value = GsPunishmentManager.normalizeCommandTemplate(commandTemplate)
+    if value == "" then
+        return ""
+    end
+
+    local idText = tostring(tonumber(targetId) or 0)
+    value = value:gsub("{%s*[Ii][Dd]%s*}", idText)
+    value = value:gsub("%%[Ii][Dd]%%", idText)
+    value = value:gsub("%$[Ii][Dd]", idText)
+    value = value:gsub("{TARGET}", idText)
+    value = value:gsub("{target}", idText)
+    return UtilityManager.toGameEncoding(value)
+end
+
+function GsPunishmentManager.executeCommands(commands, targetId, actionLabel)
+    local prepared = {}
+    for _, commandTemplate in ipairs(commands or {}) do
+        local command = GsPunishmentManager.expandCommand(commandTemplate, targetId)
+        if UtilityManager.trim(command) ~= "" then
+            prepared[#prepared + 1] = command
+        end
+    end
+
+    if #prepared == 0 then
+        if type(sampAddChatMessage) == "function" then
+            sampAddChatMessage("[GS] Bu band uchun jazo buyruqi sozlanmagan.", 0xFFCC66)
+        end
+        return false
+    end
+
+    local function emit(command)
+        local okSend = sendChat(command)
+        if okSend and LogManager and LogManager.admin then
+            LogManager.admin(string.format("GS punish [%s]: %s", tostring(actionLabel or "rule"), tostring(command)))
+        end
+        return okSend
+    end
+
+    if #prepared == 1 or not (lua_thread and type(lua_thread.create) == "function") then
+        return emit(prepared[1])
+    end
+
+    lua_thread.create(function()
+        for index, command in ipairs(prepared) do
+            emit(command)
+            if index < #prepared and type(wait) == "function" then
+                wait(120)
+            end
+        end
+    end)
+    return true
+end
+
+function GsPunishmentManager.executeRule(rule)
+    local targetId = GsPunishmentManager.getTargetId()
+    if not targetId or targetId <= 0 then
+        if type(sampAddChatMessage) == "function" then
+            sampAddChatMessage("[GS] SP target ID topilmadi.", 0xFF6666)
+        end
+        return false
+    end
+    if type(rule) ~= "table" then
+        return false
+    end
+
+    return GsPunishmentManager.executeCommands(rule.commands, targetId, rule.label or rule.id)
+end
+
+function GsPunishmentManager.applyEditor(ruleId)
+    local rule = GsPunishmentManager.getRuleById(ruleId)
+    local editor = GsPunishmentManager.editors and GsPunishmentManager.editors[ruleId]
+    if not rule or not editor then
+        return false
+    end
+
+    rule.commands = {
+        GsPunishmentManager.normalizeCommandTemplate(UtilityManager.bufferToString(editor.command1)),
+        GsPunishmentManager.normalizeCommandTemplate(UtilityManager.bufferToString(editor.command2))
+    }
+    GsPunishmentManager.markDirty()
+    return GsPunishmentManager.save(true)
+end
+
+function GsPunishmentManager.resetRule(ruleId)
+    local rule = GsPunishmentManager.getRuleById(ruleId)
+    if not rule then
+        return false
+    end
+    rule.commands = GsPunishmentManager.copyCommands(rule.defaultCommands)
+    GsPunishmentManager.syncEditorBuffers(ruleId)
+    GsPunishmentManager.markDirty()
+    return GsPunishmentManager.save(true)
+end
+
+function GsPunishmentManager.renderSpectatePanel()
+    if not GsPunishmentManager.enabled or not SpectateQuickPanel.active or not SpectateQuickPanel.targetId then
+        return
+    end
+
+    local screenX, screenY = getScreenResolution()
+    screenX = tonumber(screenX) or 1920
+    screenY = tonumber(screenY) or 1080
+
+    local ui = GsPunishmentManager.ui
+    ui.pos = ui.pos or { x = 140, y = 0 }
+    ui.size = ui.size or { width = 420, height = 400 }
+
+    local minWidth = 320
+    local minHeight = 220
+    local maxWidth = math.max(minWidth, screenX - 10)
+    local maxHeight = math.max(minHeight, screenY - 10)
+    local defaultX, defaultY = GsPunishmentManager.getDefaultPos()
+    local startX = tonumber(ui.pos.x) or defaultX
+    local startY = tonumber(ui.pos.y) or defaultY
+    local width = UtilityManager.clamp(tonumber(ui.size.width) or 420, minWidth, maxWidth)
+    local height = UtilityManager.clamp(tonumber(ui.size.height) or 400, minHeight, maxHeight)
+
+    startX = UtilityManager.clamp(startX, 10, math.max(10, screenX - width - 10))
+    startY = UtilityManager.clamp(startY, 10, math.max(10, screenY - height - 10))
+
+    if not ui.initialized then
+        imgui.SetNextWindowPos(imgui.ImVec2(startX, startY), imgui.Cond.Always)
+        imgui.SetNextWindowSize(imgui.ImVec2(width, height), imgui.Cond.Always)
+        ui.initialized = true
+    end
+
+    if imgui.SetNextWindowSizeConstraints then
+        imgui.SetNextWindowSizeConstraints(
+            imgui.ImVec2(minWidth, minHeight),
+            imgui.ImVec2(maxWidth, maxHeight)
+        )
+    end
+
+    local flags = imgui.WindowFlags.NoCollapse
+    imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.02, 0.08, 0.04, 0.92))
+    imgui.PushStyleColor(imgui.Col.Border, imgui.ImVec4(0.10, 0.70, 0.30, 0.98))
+    local styleVarPushed = 0
+    if imgui.PushStyleVar and imgui.StyleVar then
+        imgui.PushStyleVar(imgui.StyleVar.WindowRounding, 10)
+        styleVarPushed = 1
+    end
+
+    if imgui.Begin("GS Jazolar##SpectateGsPunishPanel", nil, flags) then
+        local currentPos = imgui.GetWindowPos()
+        local currentSize = imgui.GetWindowSize()
+        if currentPos and currentSize then
+            local changed = false
+            if math.abs((ui.pos.x or 0) - currentPos.x) > 0.5 or math.abs((ui.pos.y or 0) - currentPos.y) > 0.5 then
+                ui.pos.x = currentPos.x
+                ui.pos.y = currentPos.y
+                changed = true
+            end
+            if math.abs((ui.size.width or 0) - currentSize.x) > 0.5 or math.abs((ui.size.height or 0) - currentSize.y) > 0.5 then
+                ui.size.width = currentSize.x
+                ui.size.height = currentSize.y
+                changed = true
+            end
+            if changed then
+                GsPunishmentManager.markDirty()
+            end
+        end
+        GsPunishmentManager.flushUiSave(false)
+
+        imgui.TextColored(imgui.ImVec4(0.10, 0.70, 0.30, 1.0),
+            string.format("GS JAZOLAR: %s", SpectateQuickPanel.getTargetDisplay()))
+        imgui.TextDisabled("/gs bilan yoqiladi yoki o'chiriladi")
+        imgui.TextColored(imgui.ImVec4(0.95, 0.77, 0.06, 1.0), u8"GOS STRUKTURA TADBIR")
+        imgui.Separator()
+
+        local contentWidth = math.max(220, imgui.GetContentRegionAvail().x)
+        local gap = 6
+        local columns = contentWidth >= 560 and 4 or 3
+        columns = math.max(2, columns)
+        local buttonWidth = math.max(82, math.floor((contentWidth - ((columns - 1) * gap)) / columns))
+
+        local visibleRules = {}
+        for _, rule in ipairs(GsPunishmentManager.rules or {}) do
+            if rule.showInSpectate ~= false then
+                visibleRules[#visibleRules + 1] = rule
+            end
+        end
+
+        if #visibleRules == 0 then
+            imgui.TextDisabled(u8"SP panel uchun hozircha hech qanday GS band ko'rsatilmayapti.")
+        end
+
+        for index, rule in ipairs(visibleRules) do
+            if imgui.Button(tostring(rule.label or index) .. "##gs_rule_" .. tostring(rule.id or index), imgui.ImVec2(buttonWidth, 30)) then
+                GsPunishmentManager.executeRule(rule)
+            end
+
+            if imgui.IsItemHovered() then
+                imgui.BeginTooltip()
+                if imgui.PushTextWrapPos then
+                    imgui.PushTextWrapPos(420)
+                end
+                if imgui.TextUnformatted then
+                    imgui.TextUnformatted(UtilityManager.toUtf8(rule.description or "") or tostring(rule.description or ""))
+                else
+                    imgui.TextWrapped(UtilityManager.toUtf8(rule.description or "") or tostring(rule.description or ""))
+                end
+                local preview = table.concat(rule.commands or {}, " | ")
+                if UtilityManager.trim(preview) ~= "" then
+                    imgui.Separator()
+                    if imgui.TextUnformatted then
+                        imgui.TextUnformatted(preview)
+                    else
+                        imgui.TextWrapped(preview)
+                    end
+                end
+                if imgui.PopTextWrapPos then
+                    imgui.PopTextWrapPos()
+                end
+                imgui.EndTooltip()
+            end
+
+            local lastInRow = (index % columns == 0) or (index == #visibleRules)
+            if not lastInRow then
+                imgui.SameLine(0, gap)
+            end
+        end
+    end
+    imgui.End()
+
+    if styleVarPushed > 0 and imgui.PopStyleVar then
+        imgui.PopStyleVar(styleVarPushed)
+    end
+    imgui.PopStyleColor(2)
+end
+
+-- ============================================
 -- FAMILY TRACKER — Semya aniqlovchi modul
 -- FW jazo berilganda /stats ID yuborib, Oila: qatorini topadi,
 -- INI ga saqlaydi, log yozadi, SP panelda va menyuda qidiruv ishlaydi.
@@ -9558,6 +10086,7 @@ function SpectateQuickPanel.render()
     FwPunishmentManager.renderSpectatePanel()
     FuraPunishmentManager.renderSpectatePanel()
     BwPunishmentManager.renderSpectatePanel()
+    GsPunishmentManager.renderSpectatePanel()
 end
 
 
@@ -29953,6 +30482,48 @@ function MainUI.renderBwPunishmentSection()
     imgui.EndChild()
 end
 
+function MainUI.renderGsPunishmentSection()
+    imgui.TextColored(COLORS.INFO or imgui.ImVec4(0.10, 0.70, 0.30, 1.0), u8"GS Jazolar")
+    imgui.TextDisabled(u8"/gs bilan yoqiladi yoki o'chiriladi. SP paytida alohida oynacha chiqadi.")
+    imgui.TextColored(COLORS.WARNING or imgui.ImVec4(0.95, 0.77, 0.06, 1.0), u8"GOS STRUKTURA TADBIR")
+    imgui.Separator()
+
+    imgui.BeginChild("##gs_punish_rules_panel", imgui.ImVec2(0, 0), true)
+    for _, rule in ipairs(GsPunishmentManager.rules or {}) do
+        local editor = GsPunishmentManager.editors and GsPunishmentManager.editors[rule.id]
+        imgui.TextColored(COLORS.WARNING or imgui.ImVec4(0.95, 0.77, 0.06, 1.0), tostring(rule.label or "GS"))
+        imgui.SameLine()
+        imgui.TextWrapped(UtilityManager.toUtf8(rule.description or "") or tostring(rule.description or ""))
+        if editor then
+            local showInSpectate = imgui.ImBool(rule.showInSpectate ~= false)
+            if imgui.Checkbox(u8"SP panelda ko'rsatish##gs_show_" .. tostring(rule.id), showInSpectate) then
+                rule.showInSpectate = showInSpectate[0]
+                GsPunishmentManager.markDirty()
+                GsPunishmentManager.save(true)
+            end
+            imgui.InputText("1-buyruq##gs_cmd1_" .. tostring(rule.id), editor.command1, 160)
+            imgui.InputText("2-buyruq##gs_cmd2_" .. tostring(rule.id), editor.command2, 160)
+            if imgui.Button(u8"Saqlash##gs_save_" .. tostring(rule.id), imgui.ImVec2(90, 26)) then
+                GsPunishmentManager.applyEditor(rule.id)
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Default##gs_reset_" .. tostring(rule.id), imgui.ImVec2(90, 26)) then
+                GsPunishmentManager.resetRule(rule.id)
+            end
+            local preview = table.concat(rule.commands or {}, "  |  ")
+            if UtilityManager.trim(preview) ~= "" then
+                imgui.SameLine()
+                imgui.TextDisabled(preview)
+            else
+                imgui.SameLine()
+                imgui.TextDisabled("Jazo buyruqi yo'q")
+            end
+        end
+        imgui.Separator()
+    end
+    imgui.EndChild()
+end
+
 function MainUI.renderPlayerManagement()
     MainUI.playerManagementView = MainUI.playerManagementView or "main"
     if MainUI.playerManagementView == "fw" and not (FwPunishmentManager and FwPunishmentManager.enabled) then
@@ -29962,6 +30533,9 @@ function MainUI.renderPlayerManagement()
         MainUI.playerManagementView = "main"
     end
     if MainUI.playerManagementView == "bw" and not (BwPunishmentManager and BwPunishmentManager.enabled) then
+        MainUI.playerManagementView = "main"
+    end
+    if MainUI.playerManagementView == "gs" and not (GsPunishmentManager and GsPunishmentManager.enabled) then
         MainUI.playerManagementView = "main"
     end
 
@@ -29986,6 +30560,9 @@ function MainUI.renderPlayerManagement()
     if BwPunishmentManager and BwPunishmentManager.enabled then
         views[#views + 1] = { id = "bw", label = "BW" }
     end
+    if GsPunishmentManager and GsPunishmentManager.enabled then
+        views[#views + 1] = { id = "gs", label = "GS" }
+    end
 
     for _, view in ipairs(views) do
         local selected = MainUI.playerManagementView == view.id
@@ -30006,6 +30583,8 @@ function MainUI.renderPlayerManagement()
         MainUI.renderFuraPunishmentSection()
     elseif MainUI.playerManagementView == "bw" then
         MainUI.renderBwPunishmentSection()
+    elseif MainUI.playerManagementView == "gs" then
+        MainUI.renderGsPunishmentSection()
     elseif MainUI.playerManagementView == "auto_punish" then
         MainUI.renderAutoPunishmentSection()
     elseif MainUI.playerManagementView == "semya" then
@@ -34493,6 +35072,17 @@ function processCommand(cmd)
         return false
     end
 
+    if command == "gs" then
+        if not canUseTool() then
+            return false
+        end
+        local enabled = GsPunishmentManager.toggle()
+        if type(sampAddChatMessage) == "function" then
+            sampAddChatMessage(string.format("[GS] %s", enabled and "GS jazolar yoqildi." or "GS jazolar o'chirildi."), enabled and 0x33FF66 or 0xFFAA66)
+        end
+        return false
+    end
+
     -- /testfam ID  — FamilyTracker ni jazo bermay test qilish
     -- Misol: /testfam 42
     if command == "testfam" then
@@ -35164,6 +35754,7 @@ function main()
         { name = "FwPunishmentManager.initialize", fn = FwPunishmentManager.initialize },
         { name = "FuraPunishmentManager.initialize", fn = FuraPunishmentManager.initialize },
         { name = "BwPunishmentManager.initialize", fn = BwPunishmentManager.initialize },
+        { name = "GsPunishmentManager.initialize", fn = GsPunishmentManager.initialize },
         { name = "FamilyTracker.initialize", fn = FamilyTracker.initialize },
         { name = "FwReturnTracker.initialize", fn = FwReturnTracker.initialize },
         { name = "MpTeleportCloseTimer.initialize", fn = MpTeleportCloseTimer.initialize },
